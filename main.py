@@ -25,7 +25,7 @@ WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
 BOARD_SIZE = 5
 CELL_SIZE = 100
-BOARD_OFFSET_X = 200
+BOARD_OFFSET_X = 250
 BOARD_OFFSET_Y = 200
 
 class Difficulty(Enum):
@@ -879,13 +879,13 @@ class EnhancedSOSGame:
     
     def draw_title(self):
         title_text = self.font_title.render("Enhanced SOS Game", True, COLORS['text_primary'])
-        title_rect = title_text.get_rect(center=(WINDOW_WIDTH // 2, 30))
+        title_rect = title_text.get_rect(center=(WINDOW_WIDTH // 2, 120))
         self.screen.blit(title_text, title_rect)
         
         # Subtitle
         subtitle = f"Human (S) vs AI-{self.difficulty.value} (O)"
         subtitle_text = self.font_small.render(subtitle, True, COLORS['text_secondary'])
-        subtitle_rect = subtitle_text.get_rect(center=(WINDOW_WIDTH // 2, 60))
+        subtitle_rect = subtitle_text.get_rect(center=(WINDOW_WIDTH // 2, 150))
         self.screen.blit(subtitle_text, subtitle_rect)
     
     def draw_enhanced_buttons(self):
