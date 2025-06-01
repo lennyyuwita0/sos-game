@@ -15,6 +15,7 @@ import os
 from enum import Enum
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
+import math 
 
 # Initialize Pygame
 pygame.init()
@@ -25,7 +26,7 @@ WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
 BOARD_SIZE = 5
 CELL_SIZE = 100
-BOARD_OFFSET_X = 250
+BOARD_OFFSET_X = 150
 BOARD_OFFSET_Y = 200
 
 class Difficulty(Enum):
@@ -196,7 +197,7 @@ class SOSBoard:
         empty_cells = self.get_empty_cells()
         
         for row, col in empty_cells:
-            for letter in ['S', 'O']:
+            for letter in ['S', 'O']: # Ini untuk testing, bukan untuk AI benar-benar menempatkan
                 test_board = self.copy()
                 sos_count = test_board.make_move(row, col, letter)
                 if sos_count > 0:
@@ -237,73 +238,78 @@ class EnhancedAI:
     def add_points(self, points):
         self.score += points
     
+   
     def reset_score(self):
         self.score = 0
     
+    
     def get_move(self, board):
         """Get AI move based on difficulty level"""
+        # PERBAIKAN AI LETTER SELEKSI DIMULAI
+        # Pastikan AI selalu mengembalikan 'O' sebagai huruf yang akan ditempatkan
+        
+        row, col, _ = (None, None, None) # Inisialisasi dengan None
+
         if self.difficulty == Difficulty.EASY:
-            return self._get_easy_move(board)
+            row, col, _ = self._get_easy_move(board)
         elif self.difficulty == Difficulty.MEDIUM:
-            return self._get_medium_move(board)
+            row, col, _ = self._get_medium_move(board)
         else:  # HARD
-            return self._get_hard_move(board)
+            row, col, _ = self._get_hard_move(board)
+            
+        # Jika tidak ada gerakan yang valid ditemukan, kembali ke acak
+        if row is None or col is None:
+            row, col, _ = self._get_random_move(board)
+
+        # Pastikan AI selalu menempatkan 'O'
+        return row, col, self.letter
+        # PERBAIKAN AI LETTER SELEKSI BERAKHIR
     
     def _get_easy_move(self, board):
-        """Easy AI - mostly random with occasional good moves"""
-        if random.random() < 0.3:  # 30% chance of smart move
-            smart_move = self._find_sos_move(board)
-            if smart_move:
-                return smart_move
-        
-        # Random move
+        """Easy AI - always random for a chaotic experience"""
         empty_cells = board.get_empty_cells()
         if empty_cells:
             row, col = random.choice(empty_cells)
-            # Prefer 'O' slightly since AI is 'O'
-            letter = 'O' if random.random() < 0.6 else 'S'
-            return row, col, letter
+            # AI selalu main 'O'
+            return row, col, self.letter
         return None, None, None
     
     def _get_medium_move(self, board):
-        """Medium AI - balanced strategy"""
-        # 1. Try to form SOS
+        """Medium AI - 70% random, 30% smart for more chaos"""
+        if random.random() < 0.7: 
+            return self._get_random_move(board)
+
         sos_move = self._find_sos_move(board)
         if sos_move:
             return sos_move
-        
-        # 2. Try to block opponent
-        if random.random() < 0.7:  # 70% chance to block
-            blocking_move = self._find_blocking_move(board)
-            if blocking_move:
-                return blocking_move
-        
-        # 3. Strategic positioning
+
+        block_move = self._find_blocking_move(board)
+        if block_move:
+            return block_move
+
         strategic_move = self._find_strategic_move(board)
         if strategic_move:
             return strategic_move
-        
-        # 4. Random fallback
+
         return self._get_random_move(board)
     
     def _get_hard_move(self, board):
-        """Hard AI - advanced strategy with lookahead"""
-        # 1. Always try to form SOS first
+        """Hard AI - mostly random for chaos, rarely uses Minimax"""
+        if random.random() < 0.8: 
+            return self._get_random_move(board)
+
         sos_move = self._find_sos_move(board)
         if sos_move:
             return sos_move
         
-        # 2. Always block opponent SOS
         blocking_move = self._find_blocking_move(board)
         if blocking_move:
             return blocking_move
         
-        # 3. Use minimax-like evaluation for best position
         best_move = self._find_best_move_with_lookahead(board)
         if best_move:
             return best_move
         
-        # 4. Strategic positioning
         strategic_move = self._find_strategic_move(board)
         if strategic_move:
             return strategic_move
@@ -317,12 +323,12 @@ class EnhancedAI:
         max_sos = 0
         
         for row, col in empty_cells:
-            for letter in ['S', 'O']:
-                test_board = board.copy()
-                sos_count = test_board.make_move(row, col, letter)
-                if sos_count > max_sos:
-                    max_sos = sos_count
-                    best_move = (row, col, letter)
+            # AI hanya mencoba menempatkan 'O' untuk membentuk SOS
+            test_board = board.copy()
+            sos_count = test_board.make_move(row, col, self.letter) # Hanya coba 'O'
+            if sos_count > max_sos:
+                max_sos = sos_count
+                best_move = (row, col, self.letter) # Pastikan mengembalikan 'O'
         
         return best_move if max_sos > 0 else None
     
@@ -331,14 +337,12 @@ class EnhancedAI:
         empty_cells = board.get_empty_cells()
         
         for row, col in empty_cells:
-            # Check if opponent could make SOS here
-            for letter in ['S', 'O']:
-                test_board = board.copy()
-                sos_count = test_board.make_move(row, col, letter)
-                if sos_count > 0:
-                    # Block with our preferred letter or opposite
-                    block_letter = 'O' if letter == 'S' else 'S'
-                    return row, col, block_letter
+            # Coba simulasi lawan menempatkan 'S'
+            test_board_opponent = board.copy()
+            opponent_sos_count = test_board_opponent.make_move(row, col, 'S') # Lawan selalu 'S'
+            if opponent_sos_count > 0:
+                # Jika lawan bisa membuat SOS, blokir dengan 'O'
+                return row, col, self.letter # AI selalu memblokir dengan 'O'
         
         return None
     
@@ -348,35 +352,28 @@ class EnhancedAI:
         if not empty_cells:
             return None
         
-        # Prefer center and positions that could lead to future SOS
         center = board.size // 2
         scored_moves = []
         
         for row, col in empty_cells:
             score = 0
             
-            # Prefer center positions
             distance_from_center = abs(row - center) + abs(col - center)
             score += (board.size - distance_from_center) * 2
             
-            # Check potential for future SOS formations
-            for letter in ['S', 'O']:
-                test_board = board.copy()
-                test_board.board[row][col] = letter
-                
-                # Count potential SOS completions
-                potential_sos = self._count_potential_sos(test_board, row, col)
-                score += potential_sos * 5
+            # Hanya perhitungkan potensi SOS jika AI menempatkan 'O'
+            test_board = board.copy()
+            test_board.board[row][col] = self.letter # Hanya simulasi 'O'
+            
+            potential_sos = self._count_potential_sos(test_board, row, col)
+            score += potential_sos * 5
             
             scored_moves.append((score, row, col))
         
-        # Sort by score and pick best
         scored_moves.sort(reverse=True)
         if scored_moves:
             _, row, col = scored_moves[0]
-            # Choose letter strategically
-            letter = 'O' if random.random() < 0.7 else 'S'
-            return row, col, letter
+            return row, col, self.letter # Pastikan mengembalikan 'O'
         
         return None
     
@@ -391,30 +388,18 @@ class EnhancedAI:
         potential_count = 0
         current_letter = board.board[row][col]
         
+        # Perhatikan bahwa current_letter di sini sudah diasumsikan 'O' karena Strategic AI hanya mencoba 'O'
+        
         for dr, dc in directions:
-            # Check if we can complete SOS in this direction
-            if current_letter == 'S':
-                # Check S-O-? and ?-O-S patterns
-                r1, c1 = row + dr, col + dc
-                r2, c2 = row + 2*dr, col + 2*dc
-                if (board._is_valid_pos(r1, c1) and board._is_valid_pos(r2, c2)):
-                    if board.board[r1][c1] == 'O' and board.board[r2][c2] is None:
-                        potential_count += 1
-                
-                r1, c1 = row - dr, col - dc
-                r2, c2 = row - 2*dr, col - 2*dc
-                if (board._is_valid_pos(r1, c1) and board._is_valid_pos(r2, c2)):
-                    if board.board[r1][c1] == 'O' and board.board[r2][c2] is None:
-                        potential_count += 1
-            
-            elif current_letter == 'O':
-                # Check S-?-S pattern
+            if current_letter == 'O':
                 r1, c1 = row - dr, col - dc
                 r2, c2 = row + dr, col + dc
                 if (board._is_valid_pos(r1, c1) and board._is_valid_pos(r2, c2)):
                     if ((board.board[r1][c1] == 'S' and board.board[r2][c2] is None) or
                         (board.board[r1][c1] is None and board.board[r2][c2] == 'S')):
                         potential_count += 1
+            # Tambahkan logika untuk S-O-? jika AI bisa menempatkan S, tapi di sini AI hanya 'O'
+            # Jadi, kita hanya fokus pada O sebagai huruf tengah.
         
         return potential_count
     
@@ -428,24 +413,22 @@ class EnhancedAI:
         best_score = float('-inf')
         
         for row, col in empty_cells:
-            for letter in ['S', 'O']:
-                # Evaluate this move
-                test_board = board.copy()
-                immediate_score = test_board.make_move(row, col, letter, "AI")
-                
-                # Simple lookahead - check opponent's best response
-                opponent_best = 0
-                for opp_row, opp_col in test_board.get_empty_cells()[:5]:  # Limit for performance
-                    for opp_letter in ['S', 'O']:
-                        opp_board = test_board.copy()
-                        opp_score = opp_board.make_move(opp_row, opp_col, opp_letter, "Human")
-                        opponent_best = max(opponent_best, opp_score)
-                
-                total_score = immediate_score * 10 - opponent_best * 5
-                
-                if total_score > best_score:
-                    best_score = total_score
-                    best_move = (row, col, letter)
+            # AI hanya mencoba menempatkan 'O'
+            test_board = board.copy()
+            immediate_score = test_board.make_move(row, col, self.letter, "AI")
+            
+            # Simple lookahead - check opponent's best response (lawan selalu 'S')
+            opponent_best = 0
+            for opp_row, opp_col in test_board.get_empty_cells()[:5]:  # Limit for performance
+                opp_board = test_board.copy()
+                opp_score = opp_board.make_move(opp_row, opp_col, 'S', "Human") # Lawan selalu 'S'
+                opponent_best = max(opponent_best, opp_score)
+            
+            total_score = immediate_score * 10 - opponent_best * 5 # AI memaksimalkan skornya dan meminimalkan skor lawan
+            
+            if total_score > best_score:
+                best_score = total_score
+                best_move = (row, col, self.letter) # Pastikan mengembalikan 'O'
         
         return best_move
     
@@ -454,8 +437,7 @@ class EnhancedAI:
         empty_cells = board.get_empty_cells()
         if empty_cells:
             row, col = random.choice(empty_cells)
-            letter = random.choice(['S', 'O'])
-            return row, col, letter
+            return row, col, self.letter # AI selalu memilih 'O'
         return None, None, None
 
 class SoundManager:
@@ -474,10 +456,6 @@ class SoundManager:
             pass
         except:
             self.enabled = False
-    
-    def play_sound(self, sound_name):
-        if self.enabled and sound_name in self.sounds:
-            self.sounds[sound_name].play()
     
     def toggle_sound(self):
         self.enabled = not self.enabled
@@ -524,13 +502,12 @@ class EnhancedSOSGame:
         # Enhanced buttons
         self.buttons = {
             'new_game': pygame.Rect(50, 50, 100, 35),
-            'undo': pygame.Rect(160, 50, 80, 35),
-            'hint': pygame.Rect(250, 50, 80, 35),
-            'difficulty': pygame.Rect(340, 50, 100, 35),
-            'stats': pygame.Rect(450, 50, 80, 35),
-            'sound': pygame.Rect(540, 50, 80, 35),
+             'undo': pygame.Rect(160, 50, 80, 35),
+             'difficulty': pygame.Rect(250, 50, 100, 35),  # Dari 340 ke 250 (90 pixel ke kiri)
+             'stats': pygame.Rect(360, 50, 80, 35),        # Dari 450 ke 360 (90 pixel ke kiri)
             'quit': pygame.Rect(880, 50, 70, 35)
-        }
+}
+        
         
         # Highlighting
         self.sos_highlights = []
@@ -591,14 +568,10 @@ class EnhancedSOSGame:
             self.new_game()
         elif self.buttons['undo'].collidepoint(pos):
             self.undo_move()
-        elif self.buttons['hint'].collidepoint(pos):
-            self.toggle_hints()
         elif self.buttons['difficulty'].collidepoint(pos):
             self.cycle_difficulty()
         elif self.buttons['stats'].collidepoint(pos):
             self.show_stats()
-        elif self.buttons['sound'].collidepoint(pos):
-            self.sound_manager.toggle_sound()
         elif self.buttons['quit'].collidepoint(pos):
             self._save_stats()
             pygame.quit()
@@ -693,7 +666,7 @@ class EnhancedSOSGame:
         
         possible_moves = self.board.get_possible_sos_moves()
         self.hint_cells = [(row, col) for row, col, letter, count in possible_moves 
-                          if letter == 'S']  # Only show S moves for human
+                           if letter == 'S']  # Only show S moves for human
         self.show_hints = True
     
     def hide_hints(self):
@@ -733,7 +706,9 @@ class EnhancedSOSGame:
         if self.game_over:
             return
         
+        # Panggil get_move dari ai_player yang sudah dipastikan hanya mengembalikan 'O'
         row, col, letter = self.ai_player.get_move(self.board)
+        
         if row is not None:
             points = self.board.make_move(row, col, letter, self.ai_player.name)
             self.ai_player.add_points(points)
@@ -894,10 +869,8 @@ class EnhancedSOSGame:
         button_configs = [
             ('new_game', "New Game", COLORS['button']),
             ('undo', "Undo", COLORS['accent_orange']),
-            ('hint', "Hint" if not self.show_hints else "Hide", COLORS['accent_blue']),
             ('difficulty', f"Diff: {self.difficulty.value[:4]}", COLORS['accent_green']),
             ('stats', "Stats", COLORS['accent_blue']),
-            ('sound', "Sound" if self.sound_manager.enabled else "Mute", COLORS['accent_green']),
             ('quit', "Quit", COLORS['accent_red'])
         ]
         
@@ -918,11 +891,11 @@ class EnhancedSOSGame:
     def draw_enhanced_board(self):
         # Enhanced board background with shadow
         shadow_rect = pygame.Rect(BOARD_OFFSET_X - 5, BOARD_OFFSET_Y - 5, 
-                                 BOARD_SIZE * CELL_SIZE + 20, BOARD_SIZE * CELL_SIZE + 20)
+                                  BOARD_SIZE * CELL_SIZE + 20, BOARD_SIZE * CELL_SIZE + 20)
         pygame.draw.rect(self.screen, (0, 0, 0, 50), shadow_rect, border_radius=15)
         
         board_rect = pygame.Rect(BOARD_OFFSET_X - 10, BOARD_OFFSET_Y - 10, 
-                                BOARD_SIZE * CELL_SIZE + 20, BOARD_SIZE * CELL_SIZE + 20)
+                                 BOARD_SIZE * CELL_SIZE + 20, BOARD_SIZE * CELL_SIZE + 20)
         pygame.draw.rect(self.screen, COLORS['board'], board_rect, border_radius=15)
         
         # Draw cells with enhanced styling
@@ -1046,7 +1019,7 @@ class EnhancedSOSGame:
                 pygame.draw.circle(particle_surface, color_with_alpha, (size, size), size)
                 
                 self.screen.blit(particle_surface, 
-                               (int(particle['x'] - size), int(particle['y'] - size)))
+                                 (int(particle['x'] - size), int(particle['y'] - size)))
     
     def draw_move_history(self):
         # Move history panel
@@ -1129,9 +1102,6 @@ class EnhancedSOSGame:
         
         pygame.quit()
         sys.exit()
-
-# Import math for enhanced graphics
-import math
 
 if __name__ == "__main__":
     try:

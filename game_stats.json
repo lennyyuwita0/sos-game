@@ -1,0 +1,8 @@
+{
+    "games_played": 0,
+    "human_wins": 0,
+    "ai_wins": 0,
+    "draws": 0,
+    "total_sos_formed": 0,
+    "best_score": 0
+}
